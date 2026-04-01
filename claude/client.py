@@ -2,7 +2,7 @@ import os
 
 import requests
 
-from errors.errors import ValidationError
+from errors.errors import ClaudeClientError
 
 
 class ClaudeClient:
@@ -26,7 +26,7 @@ class ClaudeClient:
 
 def NewClaudeClient(base_url: str, api_key: str, version: str = "2023-06-01") -> ClaudeClient:
     if not base_url.startswith("http://") and not base_url.startswith("https://"):
-        raise ValidationError("Invalid URL: URL must start with http:// or https://")
+        raise ClaudeClientError("Invalid URL: URL must start with http:// or https://")
 
     return ClaudeClient(base_url=base_url, api_key=api_key, version=version)
 
