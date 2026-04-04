@@ -39,7 +39,7 @@ uv run python -m claude.client
 
 ## 目录
 
-- [ ] day1: 从零实现一个claude sdk
+- [x] day1: 从零实现一个claude sdk
 
 ## Other Version
 

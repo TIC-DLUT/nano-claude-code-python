@@ -33,7 +33,32 @@ class ChatModel(ClaudeClient):
         self.stream = stream
         self.tools = tools or []
 
+    def _merge_same_role_messages(self):
+        """合并相同角色的连续消息，避免API请求格式错误"""
+        current_role = CLAUDE_MESSAGE_ROLE_USER
+        request_messages: list[dict[str, str | list[str]]] = []
+
+        if len(self.messages) > 0:
+            current_role = self.messages[0]["role"]
+            request_messages.append({"role": current_role, "content": []})
+
+        for message in self.messages:
+            if message["role"] != current_role:
+                current_role = message["role"]
+                request_messages.append({"role": current_role, "content": []})
+
+            new_content = request_messages[-1]["content"]
+            if isinstance(message["content"], str):
+                new_content = [{"type": "text", "text": message["content"]}]
+            else:
+                new_content.append(message["content"])
+
+            request_messages[-1]["content"] = new_content
+        self.messages = request_messages
+
     def _get_request_body(self) -> dict:
+        """构造请求体"""
+        self._merge_same_role_messages()
         body = {
             "model": self.model,
             "messages": self.messages,
@@ -48,7 +73,9 @@ class ChatModel(ClaudeClient):
         """
         向 Claude API 发送聊天消息并返回响应。
         """
+
         body = self._get_request_body()
+
         response_body = self._session.post(
             url=f"{self.base_url}/v1/messages",
             json=body,
@@ -89,6 +116,7 @@ class ChatModel(ClaudeClient):
                 if target_tool and target_tool.func:
                     print(f"\n正在调用工具: {tool_name}，输入: {tool_input}\n")
                     tool_result = target_tool.func(tool_input)
+                    return tool_result
 
                 tool_use_result.append(
                     {
@@ -98,8 +126,6 @@ class ChatModel(ClaudeClient):
                     }
                 )
 
-            if tool_use_result:
-                self.messages.append({"role": CLAUDE_MESSAGE_ROLE_USER, "content": tool_use_result})
             else:
                 raise ClaudeClientError("工具调用失败，未找到匹配的工具或工具执行失败。")
 
@@ -216,19 +242,11 @@ class StreamableChatModel(ChatModel):
             response_body.close()
 
 
-def newTestClient(
-    model: str,
-    messages: list[dict[str, Any]] = None,
-    stream: bool = False,
-    tools: list[Tool] = None,
-    **kwargs,
-) -> ChatModel:
-
+def newTestClient() -> ChatModel:
     return ChatModel(
         model="claude-haiku-4-5",
         messages=[{"role": CLAUDE_MESSAGE_ROLE_USER, "content": "你好"}],
         stream=False,
-        **kwargs,
     )
 
 
@@ -271,4 +289,6 @@ def testStreamableChatModelWithTools():
 
 
 if __name__ == "__main__":
+    testChatModelWithTools()
+    print("---" * 10)
     testStreamableChatModelWithTools()
