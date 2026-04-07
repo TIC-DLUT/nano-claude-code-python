@@ -155,6 +155,10 @@ class StreamableChatModel(ChatModel):
 
                 if line_str.startswith("data:"):
                     data_json = line_str[6:]
+
+                    if data_json == "[DONE]":
+                        break
+
                     data_dict = json.loads(data_json)
 
                     event_type = data_dict["type"]
