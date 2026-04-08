@@ -1,4 +1,5 @@
 import json
+from collections.abc import Callable
 from typing import Any
 
 from claude.call_tool import Tool, ToolPropertyDetail, newTool
@@ -12,9 +13,12 @@ from errors.errors import ClaudeClientError
 
 def deal_func(m: dict[str, Any]) -> bool:
     if m["content"]["type"] == "text":
-        print(m["content"]["text"])
+        print(m["content"]["text"], flush=True)
     elif m["content"]["type"] == "tool_use":
-        print(f"正在调用工具: {m['content']['name']}, {m['content']['partial_json']}")
+        print(
+            f"正在调用工具: {m['content']['name']}, {m['content']['partial_json']}",
+            flush=True,
+        )
     return True
 
 
@@ -141,11 +145,15 @@ class StreamableChatModel(ChatModel):
         super().__init__(**kwargs)
         self.stream = True
 
-    def chat_with_tools(self):
+    def chat_with_tools(
+        self,
+        stream_callback: Callable[[dict[str, Any]], bool] | None = None,
+    ):
         """
         向 Claude API 发送聊天消息并以流式方式返回响应。
         """
         body = self._get_request_body()
+        event_handler = stream_callback or deal_func
         response_body = self._session.post(
             url=f"{self.base_url}/v1/messages",
             json=body,
@@ -191,7 +199,7 @@ class StreamableChatModel(ChatModel):
                                 "text": res_message[-1]["content"]["text"]
                                 + data_dict["delta"]["text"],
                             }
-                            continue_flag = deal_func(
+                            continue_flag = event_handler(
                                 {
                                     "role": CLAUDE_MESSAGE_ROLE_ASSISTANT,
                                     "content": {
@@ -207,7 +215,7 @@ class StreamableChatModel(ChatModel):
 
                             current_content["partial_json"] = old_partial + new_partial
 
-                            continue_flag = deal_func(
+                            continue_flag = event_handler(
                                 {
                                     "role": CLAUDE_MESSAGE_ROLE_ASSISTANT,
                                     "content": {

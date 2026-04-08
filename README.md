@@ -34,12 +34,15 @@ code .
 
 ``` shell
 uv sync
-uv run python -m claude.client
+uv run python -m cmd.main --message "..."
 ```
+`Direct` 模式: 非交互界面，接收一条输入直接执行并输出流式结果
+`TUI` 模式: 终端 UI 交互模式
 
 ## 目录
 
 - [x] day1: 从零实现一个claude sdk
+- [x] day2: SimpleAgentLoop
 
 ## Other Version
 

@@ -1,0 +1,7 @@
+{
+    "llm": {
+        "baseurl": "",
+        "apikey": "",
+        "model": ""
+    }
+}
