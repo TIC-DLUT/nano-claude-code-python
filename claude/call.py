@@ -7,7 +7,10 @@ from claude.message import (
     CLAUDE_MESSAGE_ROLE_ASSISTANT,
     CLAUDE_MESSAGE_ROLE_USER,
 )
-from errors.errors import ClaudeClientError
+from errors.errors import (
+    ClaudeClientError,
+    raise_for_status
+)
 
 
 def deal_func(m: dict[str, Any]) -> bool:
@@ -83,7 +86,12 @@ class ChatModel(ClaudeClient):
             url=f"{self.base_url}/v1/messages",
             json=body,
         )
-        response_body.raise_for_status()
+        # 根据非200状态码返回错误信息
+        # 若状态码为2xx，表示成功。成功则不用raise_for_status
+        # 避免读取大段的text影响性能
+        if not (200 <= response_body.status_code < 300):
+            raise_for_status(response_body.status_code, response_body.text)
+        
         response_body_json = response_body.json()
         return response_body_json["content"]
 
@@ -150,6 +158,12 @@ class StreamableChatModel(ChatModel):
             url=f"{self.base_url}/v1/messages",
             json=body,
         )
+        # 根据非200状态码返回错误信息
+        # 若状态码为2xx，表示成功。成功则不用raise_for_status
+        # 避免读取大段的text影响性能
+        if not (200 <= response_body.status_code < 300):
+            raise_for_status(response_body.status_code, response_body.text)
+        
         res_message: list[dict[str, Any]] = []
         try:
             for line in response_body.iter_lines():
