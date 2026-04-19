@@ -1,9 +1,18 @@
 [project]
 name = "nano-claude-code-python"
 version = "0.1.0"
-description = "Add your description here"
+description = "从零手写的轻量级 AI 编码智能体，不依赖 LangChain / LlamaIndex / 官方 SDK"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "requests>=2.33.0",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "ruff>=0.4.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

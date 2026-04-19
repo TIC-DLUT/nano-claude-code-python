@@ -6,7 +6,7 @@ from errors.errors import ClaudeClientError
 
 
 class ClaudeClient:
-    def __init__(self, base_url: str, api_key: str = None, version: str = "2023-06-01"):
+    def __init__(self, base_url: str, api_key: str | None = None, version: str = "2023-06-01"):
         self.base_url = base_url.rstrip("/") if base_url else "https://api.anthropic.com"
         self.api_key = api_key if api_key else os.getenv("CLAUDE_API_KEY")
         self.version = version
@@ -24,7 +24,7 @@ class ClaudeClient:
         return f"ClaudeClient(base_url={self.base_url}, api_key={self.api_key}, version={self.version})"
 
 
-def NewClaudeClient(base_url: str, api_key: str, version: str = "2023-06-01") -> ClaudeClient:
+def new_claude_client(base_url: str, api_key: str, version: str = "2023-06-01") -> ClaudeClient:
     if not base_url.startswith("http://") and not base_url.startswith("https://"):
         raise ClaudeClientError("Invalid URL: URL must start with http:// or https://")
 

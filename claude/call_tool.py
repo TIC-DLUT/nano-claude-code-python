@@ -25,7 +25,7 @@ class Tool:
 
     input_schema: InputSchema
     # func 字段是Tool所需要的, 但不应该被发送到接口
-    func: Callable[[dict[str, any]], str] | None = field(default=None, repr=False)
+    func: Callable[[dict[str, Any]], str] | None = field(default=None, repr=False)
 
     def to_request(self) -> dict[str, Any]:
         """
@@ -38,12 +38,12 @@ class Tool:
         }
 
 
-def newTool(
+def new_tool(
     name: str,
     description: str,
     properties: dict[str, ToolPropertyDetail],
     required: list[str],
-    func: Callable[[dict[str, any]], str] | None = None,
+    func: Callable[[dict[str, Any]], str] | None = None,
 ) -> Tool:
     if name is None or description is None:
         raise ClaudeClientError("Tool name and description cannot be None")

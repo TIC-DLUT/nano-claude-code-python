@@ -1,12 +1,12 @@
 from collections.abc import Callable
 from typing import Any
 
-from agent.prompt import getNowSystemPrompt
+from agent.prompt import get_now_system_prompt
 from agent.tools.filesystem import (
-    newBashTool,
-    newEditFileTool,
-    newReadFileTool,
-    newWriteFileTool,
+    new_bash_tool,
+    new_edit_file_tool,
+    new_read_file_tool,
+    new_write_file_tool,
 )
 from claude.call import StreamableChatModel
 from claude.call_tool import Tool
@@ -19,11 +19,11 @@ class Agent:
         self.tools = tools or []
         self.api_client.tools = self.tools
 
-    def loadTools(self) -> None:
-        filesystem_readfile_tool = newReadFileTool()
-        filesystem_writefile_tool = newWriteFileTool()
-        filesystem_editfile_tool = newEditFileTool()
-        filesystem_bash_tool = newBashTool()
+    def load_tools(self) -> None:
+        filesystem_readfile_tool = new_read_file_tool()
+        filesystem_writefile_tool = new_write_file_tool()
+        filesystem_editfile_tool = new_edit_file_tool()
+        filesystem_bash_tool = new_bash_tool()
 
         try:
             self.tools.append(filesystem_readfile_tool)
@@ -34,7 +34,7 @@ class Agent:
         except Exception as e:
             print(f"加载工具失败: {e}")
 
-    def chatStream(self, message: str, callback: Callable[[str], None]):
+    def chat_stream(self, message: str, callback: Callable[[str], None]):
         last_tool_call_id = ""
 
         def stream_handler(m: dict[str, Any]) -> bool:
@@ -53,26 +53,26 @@ class Agent:
             return True
 
         self.api_client.messages = [{"role": CLAUDE_MESSAGE_ROLE_USER, "content": message}]
-        self.api_client.system = getNowSystemPrompt()
+        self.api_client.system = get_now_system_prompt()
         self.api_client.chat_with_tools(stream_callback=stream_handler)
 
 
-def newAgent(base_url: str, api_key: str, model: str) -> Agent:
+def new_agent(base_url: str, api_key: str, model: str) -> Agent:
     api_client = StreamableChatModel(
         base_url=base_url,
         api_key=api_key,
         model=model,
     )
 
-    new_agent = Agent(
+    agent = Agent(
         api_client=api_client,
     )
 
-    new_agent.loadTools()
+    agent.load_tools()
 
-    return new_agent
+    return agent
 
 
 if __name__ == "__main__":
-    agent = newAgent()
+    agent = new_agent()
     print(f"Agent加载完成, 已加载工具: {[tool.name for tool in agent.tools]}")

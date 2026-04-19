@@ -2,7 +2,7 @@ import json
 from collections.abc import Callable
 from typing import Any
 
-from claude.call_tool import Tool, ToolPropertyDetail, newTool
+from claude.call_tool import Tool, ToolPropertyDetail, new_tool
 from claude.client import ClaudeClient
 from claude.message import (
     CLAUDE_MESSAGE_ROLE_ASSISTANT,
@@ -11,7 +11,7 @@ from claude.message import (
 from errors.errors import raise_for_status
 
 
-def deal_func(m: dict[str, Any]) -> bool:
+def default_stream_handler(m: dict[str, Any]) -> bool:
     if m["content"]["type"] == "text":
         print(m["content"]["text"], flush=True)
     elif m["content"]["type"] == "tool_use":
@@ -26,9 +26,9 @@ class ChatModel(ClaudeClient):
     def __init__(
         self,
         model: str,
-        messages: list[dict[str, Any]] = None,
+        messages: list[dict[str, Any]] | None = None,
         stream: bool = False,
-        tools: list[Tool] = None,
+        tools: list[Tool] | None = None,
         system: str = "",
         **kwargs,
     ):
@@ -79,6 +79,33 @@ class ChatModel(ClaudeClient):
             body["tools"] = requested_tools
         return body
 
+    def _execute_tools(self, tool_calls: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """
+        执行工具调用并收集结果。
+        每个 tool_call 必须包含: id, name, input (已解析的参数 dict)
+        """
+        tool_results = []
+        for tool_call in tool_calls:
+            tool_id = tool_call["id"]
+            tool_name = tool_call["name"]
+            tool_input = tool_call["input"]
+
+            target_tool = next((t for t in self.tools if t.name == tool_name), None)
+
+            if target_tool and target_tool.func:
+                result = target_tool.func(tool_input)
+            else:
+                result = f"工具 {tool_name} 未找到"
+
+            tool_results.append(
+                {
+                    "tool_use_id": tool_id,
+                    "type": "tool_result",
+                    "content": result,
+                }
+            )
+        return tool_results
+
     def call(self) -> str:
         """
         向 Claude API 发送聊天消息并返回响应。
@@ -118,28 +145,7 @@ class ChatModel(ClaudeClient):
                         return item["text"]
                 return ""
 
-            # 执行所有工具，收集结果
-            tool_results = []
-            for tool_call in tool_calls:
-                tool_id = tool_call["id"]
-                tool_name = tool_call["name"]
-                tool_input = tool_call["input"]
-
-                target_tool = next((t for t in self.tools if t.name == tool_name), None)
-
-                if target_tool and target_tool.func:
-                    print(f"\n正在调用工具: {tool_name}，输入: {tool_input}\n")
-                    result = target_tool.func(tool_input)
-                else:
-                    result = f"工具 {tool_name} 未找到"
-
-                tool_results.append(
-                    {
-                        "tool_use_id": tool_id,
-                        "type": "tool_result",
-                        "content": result,
-                    }
-                )
+            tool_results = self._execute_tools(tool_calls)
 
             # 将工具结果追加为 user 消息，继续循环让模型看到结果
             self.messages.append(
@@ -171,6 +177,8 @@ class StreamableChatModel(ChatModel):
         response_body = self._session.post(
             url=f"{self.base_url}/v1/messages",
             json=body,
+            # requests库特性: 只有在设置了 stream=True 后，iter_lines() 才会在接收到每行数据时就返回，而不是等整个响应结束
+            stream=True,
         )
         # 根据非200状态码返回错误信息
         # 若状态码为2xx，表示成功。成功则不用raise_for_status
@@ -253,7 +261,7 @@ class StreamableChatModel(ChatModel):
         向 Claude API 发送聊天消息并以流式方式返回响应。
         工具结果会追加到 messages 中再次发送给模型，直到模型不再调用工具。
         """
-        event_handler = stream_callback or deal_func
+        event_handler = stream_callback or default_stream_handler
 
         while True:
             content_blocks = self._stream_one_round(event_handler)
@@ -284,26 +292,9 @@ class StreamableChatModel(ChatModel):
                 }
             )
 
-            # 执行工具，收集结果
-            tool_results = []
-            for block in tool_use_blocks:
-                tool_name = block["name"]
-                tool_id = block["id"]
-                target_tool = next((t for t in self.tools if t.name == tool_name), None)
-
-                if target_tool and target_tool.func:
-                    args = json.loads(block["partial_json"])
-                    result = target_tool.func(args)
-                else:
-                    result = f"工具 {tool_name} 未找到"
-
-                tool_results.append(
-                    {
-                        "tool_use_id": tool_id,
-                        "type": "tool_result",
-                        "content": result,
-                    }
-                )
+            # 复用已解析的 input，构造 _execute_tools 所需格式
+            parsed_tool_calls = [item for item in assistant_content if item["type"] == "tool_use"]
+            tool_results = self._execute_tools(parsed_tool_calls)
 
             # 将工具结果追加为 user 消息，继续循环让模型看到结果
             self.messages.append(
@@ -314,7 +305,7 @@ class StreamableChatModel(ChatModel):
             )
 
 
-def newTestClient() -> ChatModel:
+def new_test_client() -> ChatModel:
     return ChatModel(
         model="claude-haiku-4-5",
         messages=[{"role": CLAUDE_MESSAGE_ROLE_USER, "content": "你好"}],
@@ -322,9 +313,9 @@ def newTestClient() -> ChatModel:
     )
 
 
-def testChatModelWithTools():
+def test_chat_model_with_tools():
     print("正在测试 ChatModelWithTools...")
-    get_weather_tool = newTool(
+    get_weather_tool = new_tool(
         name="get_weather",
         description="获取一个城市当前的天气",
         properties={"city": ToolPropertyDetail(type="object", description="城市的名字")},
@@ -342,9 +333,9 @@ def testChatModelWithTools():
     print(test_client.chat_with_tools())
 
 
-def testStreamableChatModelWithTools():
+def test_streamable_chat_model_with_tools():
     print("正在测试 StreamableChatModelWithTools...")
-    get_weather_tool = newTool(
+    get_weather_tool = new_tool(
         name="get_weather",
         description="获取一个城市当前的天气",
         properties={"city": ToolPropertyDetail(type="object", description="城市的名字")},
@@ -363,6 +354,6 @@ def testStreamableChatModelWithTools():
 
 
 if __name__ == "__main__":
-    testChatModelWithTools()
+    test_chat_model_with_tools()
     print("---" * 10)
-    testStreamableChatModelWithTools()
+    test_streamable_chat_model_with_tools()
